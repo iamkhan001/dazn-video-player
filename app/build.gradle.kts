@@ -3,6 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
     id("dagger.hilt.android.plugin")
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 @Suppress("UnstableApiUsage")
@@ -84,6 +86,11 @@ dependencies {
 
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.github.bumptech.glide:compose:1.0.0-alpha.1")
+
+    //firebase
+    implementation(platform("com.google.firebase:firebase-bom:32.1.1"))
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
 
     //tests
     testImplementation("junit:junit:4.13.2")

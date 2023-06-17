@@ -30,6 +30,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,10 +40,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -52,9 +57,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.navigation.compose.rememberNavController
 import com.dazn.player.R
 import com.dazn.player.data.model.Video
 import com.dazn.player.ui.theme.Purple200
+import com.dazn.player.utils.AnalyticsEventLogger
 import com.dazn.player.utils.showToast
 import java.util.concurrent.TimeUnit
 
@@ -63,16 +70,50 @@ private const val TAG = "PlayerView"
 @Composable
 @UnstableApi
 @androidx.annotation.OptIn(UnstableApi::class)
-fun VideoPlayerView() {
+fun VideoPlayerView(onBackPressed: () -> Unit) {
 
     val videoViewModel = hiltViewModel<VideoViewModel>()
     val context = LocalContext.current
     val video = remember { mutableStateOf(videoViewModel.currentVideoToPlay) }
 
+    //show no internet connection if not internet available
+    if (!videoViewModel.isInternetAvailable.value) {
+
+        val msg = context.getString(R.string.no_internet_connection)
+
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            IconButton(modifier = Modifier.size(40.dp), onClick = onBackPressed) {
+                Image(
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    painter = painterResource(id = R.drawable.ic_back),
+                    contentDescription = "Replay 5 seconds"
+                )
+            }
+            Text(
+                text = msg,
+                modifier = Modifier
+                    .align(Alignment.Center),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Purple200
+            )
+        }
+        return
+    }
+
+    //show error if video is null
     if (video.value == null) {
 
         val msg = context.getString(R.string.failed_to_load_video)
         Box(modifier = Modifier.fillMaxSize()) {
+            IconButton(modifier = Modifier.size(40.dp).padding(16.dp), onClick = onBackPressed) {
+                Image(
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    painter = painterResource(id = R.drawable.ic_back),
+                    contentDescription = "Replay 5 seconds"
+                )
+            }
             Text(
                 text = msg,
                 modifier = Modifier
@@ -87,13 +128,14 @@ fun VideoPlayerView() {
 
     Log.e(TAG,"INIT Video: $video")
 
+    //initialize exo player
     val exoPlayer = remember {
         intiExoplayer(context, video.value!!)
     }
 
     exoPlayer.playWhenReady = true
     exoPlayer.videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-    exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
+    exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
 
     val shouldShowControls = remember { mutableStateOf(false) }
     val isPlaying = remember { mutableStateOf(exoPlayer.isPlaying) }
@@ -102,6 +144,31 @@ fun VideoPlayerView() {
     val bufferedPercentage = remember { mutableStateOf(0) }
     val playbackState = remember { mutableStateOf(exoPlayer.playbackState) }
     val isBuffering = remember { mutableStateOf(true) }
+
+    //check lifecycle events to play or stop video playback
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val latestLifecycleEvent = remember { mutableStateOf(Lifecycle.Event.ON_ANY) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            latestLifecycleEvent.value = event
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+        }
+    }
+
+    when(latestLifecycleEvent.value) {
+        Lifecycle.Event.ON_RESUME -> {
+            exoPlayer.playWhenReady = true
+        }
+        Lifecycle.Event.ON_PAUSE -> {
+            exoPlayer.playWhenReady = false
+        }
+        else -> {
+
+        }
+    }
 
     val listener = object : Player.Listener {
             override fun onEvents(
@@ -126,6 +193,8 @@ fun VideoPlayerView() {
                     }
                     Player.STATE_ENDED -> {
                         Log.d(TAG, "playbackState - STATE_ENDED")
+                        videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_PLAY_NEXT)
+                        playNextVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
                     }
                     Player.STATE_IDLE -> {
                         Log.d(TAG, "playbackState - STATE_IDLE")
@@ -147,9 +216,11 @@ fun VideoPlayerView() {
                     Log.e(TAG,"onDragEnd: ${direction.value}")
                     if(direction.value > 0) {
                         Log.d(TAG,"swipe right")
+                        videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_PLAY_PREVIOUS)
                         playPreviousVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
                     }else {
                         Log.d(TAG,"swipe left")
+                        videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_PLAY_NEXT)
                         playNextVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
                     }
                 }
@@ -187,28 +258,34 @@ fun VideoPlayerView() {
             title = { video.value?.name ?: "----" },
             index = { videoViewModel.videoIndex.value },
             onPlayNext = {
+                videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_PLAY_NEXT)
                 playNextVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
             },
             onPlayPrevious = {
+                videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_PLAY_PREVIOUS)
                 playPreviousVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
             },
+            onBackPressed = onBackPressed,
             playbackState = { playbackState.value },
-            onReplayClick = { exoPlayer.seekBack() },
-            onForwardClick = { exoPlayer.seekForward() },
+            onReplayClick = {
+                videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_SEEK_REPLAY)
+                exoPlayer.seekBack()
+            },
+            onForwardClick = {
+                videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_SEEK_FORWARD)
+                exoPlayer.seekForward()
+            },
             onPauseToggle = {
                 when {
                     exoPlayer.isPlaying -> {
                         // pause the video
+                        videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_PAUSE_VIDEO)
                         exoPlayer.pause()
-                    }
-                    exoPlayer.isPlaying.not() &&
-                            playbackState.value == Player.STATE_ENDED -> {
-                        exoPlayer.seekTo(0)
-                        exoPlayer.playWhenReady = true
                     }
                     else -> {
                         // play the video
                         // it's already paused
+                        videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_RESUME_VIDEO)
                         exoPlayer.play()
                     }
                 }
@@ -218,6 +295,7 @@ fun VideoPlayerView() {
             currentTime = { currentTime.value },
             bufferedPercentage = { bufferedPercentage.value },
             onSeekChanged = { timeMs: Float ->
+                videoViewModel.logActionEvent(AnalyticsEventLogger.ACTION_SEEK_VIDEO)
                 exoPlayer.seekTo(timeMs.toLong())
             },
             showNextButton = videoViewModel.isNextVideoAvailable(),
@@ -280,6 +358,8 @@ fun intiExoplayer(context: Context, video: Video): ExoPlayer {
 
     return player
 }
+
+//need to re prepare video to play another video
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 fun playAnotherVideo(exoPlayer: ExoPlayer, video: Video?) {
 
@@ -306,6 +386,7 @@ private fun PlayerControls(
     isPlaying: () -> Boolean,
     title: () -> String,
     index: () -> Int,
+    onBackPressed: () -> Unit,
     onPlayPrevious: () -> Unit,
     onPlayNext: () -> Unit,
     onReplayClick: () -> Unit,
@@ -334,7 +415,8 @@ private fun PlayerControls(
                     .align(Alignment.TopStart)
                     .fillMaxWidth(),
                 title = title,
-                index = index
+                index = index,
+                onBackPressed = onBackPressed
             )
 
             CenterControls(
@@ -381,16 +463,35 @@ private fun PlayerControls(
 }
 
 @Composable
-private fun VideoTitle(modifier: Modifier = Modifier, title: () -> String, index: () -> Int,) {
+private fun VideoTitle(
+    modifier: Modifier = Modifier,
+    title: () -> String,
+    index: () -> Int,
+    onBackPressed: () -> Unit
+    ) {
     val videoTitle = remember(title()) { title() }
     val videoIndex = remember(index()) { index() }
 
-    Text(
-        modifier = modifier.padding(16.dp),
-        text = "#${videoIndex+1} $videoTitle",
-        style = MaterialTheme.typography.headlineLarge,
-        color = Purple200
-    )
+    Row (modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        IconButton(modifier = Modifier.size(40.dp), onClick = onBackPressed) {
+            Image(
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                painter = painterResource(id = R.drawable.ic_back),
+                contentDescription = "Replay 5 seconds"
+            )
+        }
+        Text(
+            modifier = modifier.padding(16.dp),
+            text = "#${videoIndex+1} $videoTitle",
+            style = MaterialTheme.typography.headlineLarge,
+            color = Purple200,
+            textAlign = TextAlign.End
+        )
+    }
+
+
+
 }
 
 @Composable

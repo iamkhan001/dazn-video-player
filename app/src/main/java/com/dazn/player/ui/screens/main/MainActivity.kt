@@ -1,6 +1,7 @@
 package com.dazn.player.ui.screens.main
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -16,6 +17,8 @@ import com.dazn.player.R
 import com.dazn.player.ui.screens.home.HomeScreen
 import com.dazn.player.ui.screens.player.VideoPlayerActivity
 import com.dazn.player.ui.theme.DAZNPlayerTheme
+import com.dazn.player.utils.NetworkUtils
+import com.dazn.player.utils.showToast
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -36,11 +39,25 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     HomeScreen (getString(R.string.app_name)){  index, video ->
-                        VideoPlayerActivity.start(this, index)
+                        if (mainViewModel.isInternetAvailable.value) {
+                            VideoPlayerActivity.start(this, index)
+                        }else {
+                            showToast(getString(R.string.no_internet_connection))
+                        }
                     }
                 }
             }
         }
+
+        NetworkUtils.getNetworkLiveData(this).observe(this) {
+            Log.d(TAG,"NetworkUtils: Internet Available > $it")
+            mainViewModel.isInternetAvailable.value = it
+        }
+
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
     }
 }
 

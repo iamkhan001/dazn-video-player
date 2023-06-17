@@ -2,6 +2,7 @@ package com.dazn.player.ui.screens.home
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.dazn.player.R
@@ -42,6 +44,33 @@ fun VideoListItem(index: Int, video: Video, navigateToVideo: (Int, Video) -> Uni
             ) {
                 Text(text = video.name, style = typography.bodyMedium)
             }
+        }
+    }
+}
+
+@Composable
+fun VideoListItemVertical(index: Int, video: Video, navigateToVideo: (Int, Video) -> Unit) {
+    Card(
+        modifier = Modifier
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(corner = CornerSize(16.dp)),
+    ) {
+        Column(
+            Modifier
+                .clickable { navigateToVideo(index, video) }
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+
+        ) {
+            VideoThumbImage(video)
+            Text(
+                text = video.name,
+                style = typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }

@@ -22,6 +22,9 @@ class MainViewModel @Inject constructor(private val videoRepository: VideoReposi
 
     val videoList: MutableState<List<Video>?> = mutableStateOf(null)
 
+    //to check internet connection
+    val isInternetAvailable = mutableStateOf(false)
+
     init {
         viewModelScope.launch {
             //load video list from json file in assets

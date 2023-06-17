@@ -4,4 +4,5 @@
     <string name="no_previous_video_to_play">No previous video to play</string>
     <string name="no_next_video_to_play">No next video to play</string>
     <string name="failed_to_load_video">Failed to load video!</string>
+    <string name="no_internet_connection">No Internet connection</string>
 </resources>
