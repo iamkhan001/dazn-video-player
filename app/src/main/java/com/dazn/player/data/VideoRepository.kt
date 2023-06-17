@@ -11,4 +11,15 @@ class VideoRepository(private val context: Context) {
         return DataConvertor.toVideList(json)
     }
 
+    fun loadTestVideos(): ArrayList<Video> {
+        val list = ArrayList<Video>()
+        list.add(
+            Video(
+                "test name",
+                "test url"
+        ))
+
+        return list
+    }
+
 }

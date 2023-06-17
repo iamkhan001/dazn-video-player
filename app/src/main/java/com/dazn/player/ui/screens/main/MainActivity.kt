@@ -1,4 +1,4 @@
-package com.dazn.player.ui.screens.activity
+package com.dazn.player.ui.screens.main
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,6 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.dazn.player.R
+import com.dazn.player.ui.screens.home.HomeScreen
+import com.dazn.player.ui.screens.player.VideoPlayerActivity
 import com.dazn.player.ui.theme.DAZNPlayerTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -32,22 +35,21 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Greeting("Android")
+                    HomeScreen (getString(R.string.app_name)){  index, video ->
+                        VideoPlayerActivity.start(this, index)
+                    }
                 }
             }
         }
     }
 }
 
-@Composable
-fun Greeting(name: String) {
-    Text(text = "Hello $name!")
-}
-
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
     DAZNPlayerTheme {
-        Greeting("Android")
+        HomeScreen("Android") {
+                index, video ->
+        }
     }
 }

@@ -52,6 +52,9 @@ android {
 }
 
 dependencies {
+    implementation(platform("androidx.compose:compose-bom:2022.10.00"))
+    implementation("androidx.compose.ui:ui-graphics")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2022.10.00"))
     val composeVersion = "1.2.0"
 
     implementation("androidx.core:core-ktx:1.10.1")
@@ -74,7 +77,13 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.43.2")
     kapt("com.google.dagger:hilt-android-compiler:2.43.2")
 
+    //Media3
+    implementation("androidx.media3:media3-exoplayer:1.0.2")
+    implementation("androidx.media3:media3-ui:1.0.2")
+    implementation("androidx.media3:media3-exoplayer-dash:1.0.2")
+
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.github.bumptech.glide:compose:1.0.0-alpha.1")
 
     //tests
     testImplementation("junit:junit:4.13.2")
@@ -84,3 +93,4 @@ dependencies {
     debugImplementation ("androidx.compose.ui:ui-tooling:$composeVersion")
     debugImplementation ("androidx.compose.ui:ui-test-manifest:$composeVersion")
 }
+

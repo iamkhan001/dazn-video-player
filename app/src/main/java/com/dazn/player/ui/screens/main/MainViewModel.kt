@@ -1,4 +1,4 @@
-package com.dazn.player.ui.screens.activity
+package com.dazn.player.ui.screens.main
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class MainViewModel @Inject constructor(val videoRepository: VideoRepository) : ViewModel() {
+class MainViewModel @Inject constructor(private val videoRepository: VideoRepository) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(true)
 
