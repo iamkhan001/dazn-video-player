@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.core.view.WindowCompat
 import com.dazn.player.ui.screens.main.MainActivity
 import com.dazn.player.ui.theme.DAZNPlayerTheme
 import com.dazn.player.utils.AnalyticsEventLogger
@@ -26,6 +28,12 @@ class VideoPlayerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        )
+
         setContent {
             DAZNPlayerTheme {
                 // A surface container using the 'background' color from the theme
@@ -52,6 +60,7 @@ class VideoPlayerActivity : ComponentActivity() {
                 showToast("No Internet connection")
             }
         }
+
     }
 
     companion object {
