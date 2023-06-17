@@ -1,5 +1,6 @@
 package com.dazn.player.ui.screens.player
 
+import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -7,82 +8,86 @@ import androidx.lifecycle.viewModelScope
 import com.dazn.player.data.VideoRepository
 import com.dazn.player.data.model.Video
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class VideoViewModel @Inject constructor(private val videoRepository: VideoRepository) : ViewModel() {
 
-    private val _isLoading = MutableStateFlow(true)
-
-    val isLoading get() = _isLoading.asStateFlow()
+    private val videoList: MutableState<List<Video>?> = mutableStateOf(null)
 
     var videoIndex = 0
-
-    val videoList: MutableState<List<Video>?> = mutableStateOf(null)
-    val currentVideoToPlay: MutableState<Video?> = mutableStateOf(null)
+    var currentVideoToPlay: Video? =null
 
     init {
         viewModelScope.launch {
-            //load video list from json file in assets
             videoList.value = videoRepository.loadVideos()
-            //delay to show loading animation
-            delay(1000)
-            _isLoading.value = false
         }
     }
 
-    fun initVideo(index: Int) {
+    fun initVideo(index: Int) = viewModelScope.launch {
         val videos = videoList.value
         if (videos.isNullOrEmpty()) {
-            return
+            return@launch
         }
         videoIndex = index
+        Log.e("VMV", "index = $videoIndex")
+
         if (videoIndex in videos.indices) {
-            currentVideoToPlay.value = videos[videoIndex]
-            return
+            currentVideoToPlay = videos[videoIndex]
+            return@launch
         }
     }
 
-    fun playNextVideo() {
+    fun playNextVideo(): Boolean {
         val videos = videoList.value
 
+        Log.e(TAG,"playNextVideo: $videos, $videoIndex")
+
         if (videos.isNullOrEmpty()) {
-            return
+            return false
         }
 
-        videoIndex+=1
+        if(videoIndex < videos.size-1) {
+            videoIndex+=1
 
-        if (videoIndex in videos.indices) {
-            currentVideoToPlay.value = videos[videoIndex]
-            return
+            if (videoIndex in videos.indices) {
+                currentVideoToPlay = videos[videoIndex]
+                return true
+            }
         }
 
-        videoIndex = 0
-        currentVideoToPlay.value = videos[videoIndex]
-
+        return false
     }
 
-    fun playPreviousVideo() {
+    fun playPreviousVideo(): Boolean {
         val videos = videoList.value
 
+        Log.e(TAG,"playPreviousVideo: $videos, $videoIndex")
+
         if (videos.isNullOrEmpty()) {
-            return
+            return false
         }
 
-        videoIndex-=1
+        if (videoIndex > 0) {
+            videoIndex-=1
 
-        if (videoIndex in videos.indices) {
-            currentVideoToPlay.value = videos[videoIndex]
-            return
+            if (videoIndex in videos.indices) {
+                currentVideoToPlay = videos[videoIndex]
+                return true
+            }
+
         }
 
-        videoIndex = 0
-        currentVideoToPlay.value = videos[videoIndex]
+        return false
     }
 
+    fun isNextVideoAvailable(): Boolean = videoIndex < ((videoList.value?.size ?: 0) - 1)
+
+    fun isPreviousVideoAvailable(): Boolean = videoIndex > 0
+
+    companion object {
+        private const val TAG = "VideoViewModel"
+    }
 
 }
