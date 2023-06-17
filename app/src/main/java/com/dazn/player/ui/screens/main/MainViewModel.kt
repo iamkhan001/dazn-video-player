@@ -29,8 +29,8 @@ class MainViewModel @Inject constructor(private val videoRepository: VideoReposi
         viewModelScope.launch {
             //load video list from json file in assets
             videoList.value = videoRepository.loadVideos()
-            //delay to show loading animation
-            delay(1000)
+            //delay to show default splash screen
+            delay(500)
             _isLoading.value = false
         }
     }
