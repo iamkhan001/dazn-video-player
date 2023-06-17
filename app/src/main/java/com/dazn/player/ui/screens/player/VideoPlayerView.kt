@@ -1,6 +1,7 @@
 package com.dazn.player.ui.screens.player
 
 import android.content.Context
+import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.animation.AnimatedVisibility
@@ -12,6 +13,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,19 +22,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDismissState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -42,8 +46,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.Player.STATE_ENDED
-import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -53,6 +55,7 @@ import androidx.media3.ui.PlayerView
 import com.dazn.player.R
 import com.dazn.player.data.model.Video
 import com.dazn.player.ui.theme.Purple200
+import com.dazn.player.utils.showToast
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "PlayerView"
@@ -60,26 +63,37 @@ private const val TAG = "PlayerView"
 @Composable
 @UnstableApi
 @androidx.annotation.OptIn(UnstableApi::class)
-fun VideoPlayerView(modifier: Modifier = Modifier) {
+fun VideoPlayerView() {
 
     val videoViewModel = hiltViewModel<VideoViewModel>()
     val context = LocalContext.current
-    val video = videoViewModel.currentVideoToPlay
+    val video = remember { mutableStateOf(videoViewModel.currentVideoToPlay) }
 
-    if (video == null) {
-        Text(
-            text = "Failed to load video!",
-        )
+    if (video.value == null) {
+
+        val msg = context.getString(R.string.failed_to_load_video)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Text(
+                text = msg,
+                modifier = Modifier
+                    .align(Alignment.Center),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Purple200
+            )
+        }
+
         return
     }
+
+    Log.e(TAG,"INIT Video: $video")
+
     val exoPlayer = remember {
-        intiExoplayer(context, video)
+        intiExoplayer(context, video.value!!)
     }
 
     exoPlayer.playWhenReady = true
     exoPlayer.videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
     exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
-
 
     val shouldShowControls = remember { mutableStateOf(false) }
     val isPlaying = remember { mutableStateOf(exoPlayer.isPlaying) }
@@ -87,26 +101,63 @@ fun VideoPlayerView(modifier: Modifier = Modifier) {
     val currentTime = remember { mutableStateOf(0L) }
     val bufferedPercentage = remember { mutableStateOf(0) }
     val playbackState = remember { mutableStateOf(exoPlayer.playbackState) }
+    val isBuffering = remember { mutableStateOf(true) }
 
-    Box(modifier = modifier) {
-        DisposableEffect(key1 = Unit) {
-            val listener =
-                object : Player.Listener {
-                    override fun onEvents(
-                        player: Player,
-                        events: Player.Events
-                    ) {
-                        super.onEvents(player, events)
-                        totalDuration.value = player.duration.coerceAtLeast(0L)
-                        currentTime.value = player.currentPosition.coerceAtLeast(0L)
-                        bufferedPercentage.value = player.bufferedPercentage
-                        isPlaying.value = player.isPlaying
-                        playbackState.value = player.playbackState
+    val listener = object : Player.Listener {
+            override fun onEvents(
+                player: Player,
+                events: Player.Events
+            ) {
+                super.onEvents(player, events)
+                totalDuration.value = player.duration.coerceAtLeast(0L)
+                currentTime.value = player.currentPosition.coerceAtLeast(0L)
+                bufferedPercentage.value = player.bufferedPercentage
+                isPlaying.value = player.isPlaying
+                playbackState.value = player.playbackState
+
+                when(player.playbackState) {
+                    Player.STATE_BUFFERING -> {
+                        isBuffering.value = true
+                        Log.d(TAG, "playbackState - STATE_BUFFERING")
+                    }
+                    Player.STATE_READY -> {
+                        isBuffering.value = false
+                        Log.d(TAG, "playbackState - STATE_READY")
+                    }
+                    Player.STATE_ENDED -> {
+                        Log.d(TAG, "playbackState - STATE_ENDED")
+                    }
+                    Player.STATE_IDLE -> {
+                        Log.d(TAG, "playbackState - STATE_IDLE")
                     }
                 }
+            }
+        }
 
+    val direction = remember { mutableStateOf(0f) }
+
+    Box(modifier = Modifier
+        .pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { change, dragAmount ->
+                    Log.d(TAG,"onHorizontalDrag: $change, dragAmount: $dragAmount")
+                    direction.value = dragAmount
+                },
+                onDragEnd = {
+                    Log.e(TAG,"onDragEnd: ${direction.value}")
+                    if(direction.value > 0) {
+                        Log.d(TAG,"swipe right")
+                        playPreviousVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
+                    }else {
+                        Log.d(TAG,"swipe left")
+                        playNextVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
+                    }
+                }
+            )
+        }
+    ) {
+        DisposableEffect(key1 = Unit) {
             exoPlayer.addListener(listener)
-
             onDispose {
                 exoPlayer.removeListener(listener)
                 exoPlayer.release()
@@ -133,24 +184,13 @@ fun VideoPlayerView(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxSize(),
             isVisible = { shouldShowControls.value },
             isPlaying = { isPlaying.value },
-            title = { exoPlayer.mediaMetadata.displayTitle.toString() },
+            title = { video.value?.name ?: "----" },
+            index = { videoViewModel.videoIndex.value },
             onPlayNext = {
-                shouldShowControls.value = false
-                if(videoViewModel.playNextVideo()) {
-                    Log.d(TAG,"onPlayNext: $video")
-                    playAnotherVideo(exoPlayer, videoViewModel.currentVideoToPlay)
-                }else {
-                    Log.e(TAG,"No next video to play")
-                }
+                playNextVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
             },
             onPlayPrevious = {
-                shouldShowControls.value = false
-                if(videoViewModel.playPreviousVideo()) {
-                    Log.d(TAG,"onPlayPrevious: $video")
-                    playAnotherVideo(exoPlayer, videoViewModel.currentVideoToPlay)
-                }else {
-                    Log.e(TAG,"No previous video to play")
-                }
+                playPreviousVideo(context, videoViewModel, exoPlayer, video, shouldShowControls)
             },
             playbackState = { playbackState.value },
             onReplayClick = { exoPlayer.seekBack() },
@@ -162,7 +202,7 @@ fun VideoPlayerView(modifier: Modifier = Modifier) {
                         exoPlayer.pause()
                     }
                     exoPlayer.isPlaying.not() &&
-                            playbackState.value == STATE_ENDED -> {
+                            playbackState.value == Player.STATE_ENDED -> {
                         exoPlayer.seekTo(0)
                         exoPlayer.playWhenReady = true
                     }
@@ -183,8 +223,41 @@ fun VideoPlayerView(modifier: Modifier = Modifier) {
             showNextButton = videoViewModel.isNextVideoAvailable(),
             showPreviousButton = videoViewModel.isPreviousVideoAvailable(),
         )
-    }
 
+        if (isBuffering.value) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+    }
+}
+
+fun playNextVideo(context: Context, videoViewModel: VideoViewModel, exoPlayer: ExoPlayer, video: MutableState<Video?>,  shouldShowControls: MutableState<Boolean>) {
+    shouldShowControls.value = false
+    if(videoViewModel.playNextVideo()) {
+        exoPlayer.playWhenReady = false
+        video.value = videoViewModel.currentVideoToPlay!!
+        playAnotherVideo(exoPlayer, videoViewModel.currentVideoToPlay)
+    }else {
+        val msg = context.getString(R.string.no_next_video_to_play)
+        context.showToast(msg)
+        Log.e(TAG, msg)
+    }
+}
+fun playPreviousVideo(context: Context, videoViewModel: VideoViewModel, exoPlayer: ExoPlayer, video: MutableState<Video?>,  shouldShowControls: MutableState<Boolean>) {
+    shouldShowControls.value = false
+    if(videoViewModel.playPreviousVideo()) {
+        exoPlayer.playWhenReady = false
+        video.value = videoViewModel.currentVideoToPlay
+        playAnotherVideo(exoPlayer, videoViewModel.currentVideoToPlay)
+    }else {
+        val msg = context.getString(R.string.no_previous_video_to_play)
+        context.showToast(msg)
+        Log.e(TAG, msg)
+    }
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -221,6 +294,7 @@ fun playAnotherVideo(exoPlayer: ExoPlayer, video: Video?) {
 
     exoPlayer.setMediaSource(source)
     exoPlayer.prepare()
+    exoPlayer.playWhenReady = true
 }
 
 
@@ -231,6 +305,7 @@ private fun PlayerControls(
     isVisible: () -> Boolean,
     isPlaying: () -> Boolean,
     title: () -> String,
+    index: () -> Int,
     onPlayPrevious: () -> Unit,
     onPlayNext: () -> Unit,
     onReplayClick: () -> Unit,
@@ -254,11 +329,12 @@ private fun PlayerControls(
         exit = fadeOut()
     ) {
         Box(modifier = Modifier.background(Color.Black.copy(alpha = 0.6f))) {
-            TopControl(
+            VideoTitle(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .fillMaxWidth(),
-                title = title
+                title = title,
+                index = index
             )
 
             CenterControls(
@@ -276,7 +352,7 @@ private fun PlayerControls(
                 showPreviousButton = showPreviousButton,
             )
 
-            BottomControls(
+            SeekbarControls(
                 modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
@@ -305,13 +381,14 @@ private fun PlayerControls(
 }
 
 @Composable
-private fun TopControl(modifier: Modifier = Modifier, title: () -> String) {
+private fun VideoTitle(modifier: Modifier = Modifier, title: () -> String, index: () -> Int,) {
     val videoTitle = remember(title()) { title() }
+    val videoIndex = remember(index()) { index() }
 
     Text(
         modifier = modifier.padding(16.dp),
-        text = videoTitle,
-        style = MaterialTheme.typography.bodyMedium,
+        text = "#${videoIndex+1} $videoTitle",
+        style = MaterialTheme.typography.headlineLarge,
         color = Purple200
     )
 }
@@ -368,7 +445,7 @@ private fun CenterControls(
                     isVideoPlaying -> {
                         painterResource(id = R.drawable.ic_pause)
                     }
-                    isVideoPlaying.not() && playerState == STATE_ENDED -> {
+                    isVideoPlaying.not() && playerState == Player.STATE_ENDED -> {
                         painterResource(id = R.drawable.ic_replay)
                     }
                     else -> {
@@ -406,7 +483,7 @@ private fun CenterControls(
 }
 
 @Composable
-private fun BottomControls(
+private fun SeekbarControls(
     modifier: Modifier = Modifier,
     totalDuration: () -> Long,
     currentTime: () -> Long,

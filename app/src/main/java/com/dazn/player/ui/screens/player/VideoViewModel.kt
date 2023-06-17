@@ -16,7 +16,8 @@ class VideoViewModel @Inject constructor(private val videoRepository: VideoRepos
 
     private val videoList: MutableState<List<Video>?> = mutableStateOf(null)
 
-    var videoIndex = 0
+    var videoIndex = mutableStateOf(0)
+
     var currentVideoToPlay: Video? =null
 
     init {
@@ -30,11 +31,11 @@ class VideoViewModel @Inject constructor(private val videoRepository: VideoRepos
         if (videos.isNullOrEmpty()) {
             return@launch
         }
-        videoIndex = index
+        videoIndex.value = index
         Log.e("VMV", "index = $videoIndex")
 
-        if (videoIndex in videos.indices) {
-            currentVideoToPlay = videos[videoIndex]
+        if (videoIndex.value in videos.indices) {
+            currentVideoToPlay = videos[videoIndex.value]
             return@launch
         }
     }
@@ -48,11 +49,11 @@ class VideoViewModel @Inject constructor(private val videoRepository: VideoRepos
             return false
         }
 
-        if(videoIndex < videos.size-1) {
-            videoIndex+=1
+        if(videoIndex.value < videos.size-1) {
+            videoIndex.value+=1
 
-            if (videoIndex in videos.indices) {
-                currentVideoToPlay = videos[videoIndex]
+            if (videoIndex.value in videos.indices) {
+                currentVideoToPlay = videos[videoIndex.value]
                 return true
             }
         }
@@ -69,11 +70,11 @@ class VideoViewModel @Inject constructor(private val videoRepository: VideoRepos
             return false
         }
 
-        if (videoIndex > 0) {
-            videoIndex-=1
+        if (videoIndex.value > 0) {
+            videoIndex.value-=1
 
-            if (videoIndex in videos.indices) {
-                currentVideoToPlay = videos[videoIndex]
+            if (videoIndex.value in videos.indices) {
+                currentVideoToPlay = videos[videoIndex.value]
                 return true
             }
 
@@ -82,9 +83,9 @@ class VideoViewModel @Inject constructor(private val videoRepository: VideoRepos
         return false
     }
 
-    fun isNextVideoAvailable(): Boolean = videoIndex < ((videoList.value?.size ?: 0) - 1)
+    fun isNextVideoAvailable(): Boolean = videoIndex.value < ((videoList.value?.size ?: 0) - 1)
 
-    fun isPreviousVideoAvailable(): Boolean = videoIndex > 0
+    fun isPreviousVideoAvailable(): Boolean = videoIndex.value > 0
 
     companion object {
         private const val TAG = "VideoViewModel"

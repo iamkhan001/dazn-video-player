@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">DAZN Player</string>
     <string name="title_activity_video_player">VideoPlayerActivity</string>
+    <string name="no_previous_video_to_play">No previous video to play</string>
+    <string name="no_next_video_to_play">No next video to play</string>
+    <string name="failed_to_load_video">Failed to load video!</string>
 </resources>
