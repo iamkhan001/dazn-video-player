@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     HomeScreen (getString(R.string.app_name)){  index, video ->
                         if (mainViewModel.isInternetAvailable.value) {
+                            //using separate activity to show player screen, I think it's better way to make video player in another activity
                             VideoPlayerActivity.start(this, index)
                         }else {
                             showToast(getString(R.string.no_internet_connection))
